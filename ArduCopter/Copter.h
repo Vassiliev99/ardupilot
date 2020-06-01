@@ -178,7 +178,7 @@
 #include <SITL/SITL.h>
 #endif
 
-#include "mode.h"
+#include "../../../../../Users/I500447/Desktop/New folder (3)/mode.h"
 
 class Copter : public AP_Vehicle {
 public:
@@ -225,6 +225,7 @@ public:
     friend class ModeThrow;
     friend class ModeZigZag;
     friend class ModeAutorotate;
+    friend class ModeFallNoGPS;
 
     Copter(void);
 
@@ -960,6 +961,9 @@ private:
 #endif
 #if MODE_AUTOROTATE_ENABLED == ENABLED
     ModeAutorotate mode_autorotate;
+#endif
+#if MODE_FALL_NOGPS_ENABLED == ENABLED
+    ModeFallNoGPS mode_fall_nogps;
 #endif
 
     // mode.cpp

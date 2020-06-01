@@ -169,12 +169,19 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
+#if MODE_FALL_NOGPS_ENABLED == ENABLED
+        case Mode::Number::FALL_NOGPS:
+            ret = &mode_fall_nogps;
+            break;
+#endif
+
         default:
             break;
     }
 
     return ret;
 }
+
 
 
 // set_mode - change flight mode and perform any necessary initialisation
