@@ -195,6 +195,7 @@ float AC_PID::update_error(float error, bool limit)
     _pid_info.error = _error;
     _pid_info.P = P_out;
     _pid_info.D = D_out;
+    //_integrator = 0.0f;
 
     return P_out + _integrator + D_out;
 }

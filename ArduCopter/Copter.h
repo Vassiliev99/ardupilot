@@ -178,7 +178,7 @@
 #include <SITL/SITL.h>
 #endif
 
-#include "../../../../../Users/I500447/Desktop/New folder (3)/mode.h"
+#include "mode.h"
 
 class Copter : public AP_Vehicle {
 public:

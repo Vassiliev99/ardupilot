@@ -322,6 +322,25 @@ void AC_AttitudeControl_Multi::rate_controller_run()
     _motors.set_yaw(get_rate_yaw_pid().update_all(_rate_target_ang_vel.z, gyro_latest.z, _motors.limit.yaw) + _actuator_sysid.z);
     _motors.set_yaw_ff(get_rate_yaw_pid().get_ff()*_feedforward_scalar);
 
+    static int counter1 = 0;
+    counter1++;
+    if (counter1 == 300) {
+        counter1 = 0;
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.5f %5.5f %5.5f %5.5f", throttle_thrust_best_rpy, thr_adj, rpy_scale, _thrust_rpyt_out[0]);
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.3f %5.3f %5.3f", _motors.limit.roll, _motors.limit.pitch, _motors.limit.yaw);
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "a %5.3f %5.3f %5.3f", _rate_target_ang_vel.x, _rate_target_ang_vel.y, _rate_target_ang_vel.z);
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "r %5.3f %5.3f %5.3f", get_rate_yaw_pid().get_pid_info().P, get_rate_yaw_pid().get_pid_info().I, get_rate_yaw_pid().get_pid_info().D);
+
+    }
+    else if (counter1 == 200) {
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "g %5.3f %5.3f %5.3f", gyro_latest.x, gyro_latest.y, gyro_latest.z);
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "p %5.3f %5.3f %5.3f", get_rate_pitch_pid().get_pid_info().P, get_rate_pitch_pid().get_pid_info().I, get_rate_pitch_pid().get_pid_info().D);
+
+    }
+    else if (counter1 == 100) {
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "m %5.3f %5.3f %5.3f", _motors.get_roll(), _motors.get_pitch(), _motors.get_yaw());
+    }
+
     _rate_sysid_ang_vel.zero();
     _actuator_sysid.zero();
 

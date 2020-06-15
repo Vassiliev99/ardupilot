@@ -23,6 +23,8 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_BattMonitor/AP_BattMonitor.h>
 
+#include <GCS_MAVLink/GCS.h>
+
 extern const AP_HAL::HAL& hal;
 
 // parameters for the motor class
@@ -228,8 +230,8 @@ AP_MotorsMulticopter::AP_MotorsMulticopter(uint16_t loop_rate, uint16_t speed_hz
     _batt_voltage_filt.reset(1.0f);
 
     // default throttle range
-    _throttle_radio_min = 1100;
-    _throttle_radio_max = 1900;
+    _throttle_radio_min = 800;
+    _throttle_radio_max = 2200;
 };
 
 // output - sends commands to the motors
@@ -426,7 +428,7 @@ int16_t AP_MotorsMulticopter::output_to_pwm(float actuator)
 float AP_MotorsMulticopter::thrust_to_actuator(float thrust_in)
 {
     thrust_in = constrain_float(thrust_in, 0.0f, 1.0f);
-    return _spin_min + (_spin_max - _spin_min) * apply_thrust_curve_and_volt_scaling(thrust_in);
+    return _spin_min + (_spin_max - _spin_min) * thrust_in;
 }
 
 // adds slew rate limiting to actuator output
