@@ -1522,5 +1522,8 @@ protected:
 
 private:
 
+    float _arming_alt;
+    int _parachute_pwm;
+
 };
 

@@ -9,6 +9,9 @@ bool ModeFallNoGPS::init(bool ignore_checks)
     //attitude_control->input_euler_angle_roll_pitch_yaw(0.0f, 0.0f, 0.0f, false);
     //motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
+    _arming_alt = 0;
+    _parachute_pwm = 1000;
+
     return true;
 }
 
@@ -35,11 +38,16 @@ void ModeFallNoGPS::run()
     
     //pos_control->get_alt
 
-    int parachute_pwm = 1000;
-    if (motors->armed() && pos_control->get_current_alt() < 10000) {
-        parachute_pwm = 2000;
+    if (motors->armed()) {
+        if (_arming_alt + AP::baro().get_altitude() < g.parachute_alt) {
+            _parachute_pwm = 2000;
+        }
     }
-    SRV_Channels::set_output_pwm(SRV_Channel::k_parachute_release, parachute_pwm);
+    else {
+        _arming_alt = AP::baro().get_altitude();
+    }
+    SRV_Channels::set_output_pwm(SRV_Channel::k_parachute_release, _parachute_pwm);
+    
 
     static int counter = 0;
     counter++;
@@ -49,12 +57,12 @@ void ModeFallNoGPS::run()
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.5f", pos_control->get_current_alt());
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.3f %5.3f %5.3f %5.3f", _thrust_rpyt_out[0], _thrust_rpyt_out[1], _thrust_rpyt_out[2], _thrust_rpyt_out[3]);
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "t %5.3f %5.3f %5.3f", target_roll, target_pitch, target_yaw_rate);
-        AP::logger().Write("PRCT", "TimeUS,Pwm,Alt", "Qif",
-                                        AP_HAL::micros64(),
-                                        parachute_pwm,
-                                        pos_control->get_current_alt());
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.3f %5.3f %d", AP::baro().get_altitude(), _parachute_pwm);
     }
 
-
-    
+    AP::logger().Write("PRCT", "TimeUS,Alt,ArmAlt,Pwm", "Qffi",
+                                AP_HAL::micros64(),
+                                AP::baro().get_altitude(),
+                                _arming_alt,
+                                _parachute_pwm);
 }

@@ -214,6 +214,14 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SAFE_TIME", 42, AP_MotorsMulticopter, _safe_time, AP_MOTORS_SAFE_TIME_DEFAULT),
 
+    // @Param: RPY_REVERSED
+    // @DisplayName: RPY Reversed
+    // @Description: Reverse RPY output in MotorsMatrix
+    // @Range: 0 1
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("RPY_REVERSED", 43, AP_MotorsMulticopter, rpy_reversed, AP_MOTORS_RPY_REVERSED_DEFAULT),
+
     AP_GROUPEND
 };
 

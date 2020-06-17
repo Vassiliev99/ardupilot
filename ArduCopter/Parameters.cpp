@@ -36,6 +36,14 @@
 #endif
 
 const AP_Param::Info Copter::var_info[] = {
+    // @Param: PARACHUTE_ALT
+    // @DisplayName: Parachute launch altitude
+    // @Description: Parachute launch altitude for Fall mode in meters
+    // @Range: 0 1000
+    // @Units: m
+    // @User: Advanced
+    GSCALAR(parachute_alt, "PARACHUTE_ALT", PARACHUTE_ALT_DEFAULT),
+    
     // @Param: FORMAT_VERSION
     // @DisplayName: Eeprom format version number
     // @Description: This value is incremented when changes are made to the eeprom format

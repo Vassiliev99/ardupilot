@@ -170,15 +170,16 @@ void AP_MotorsMatrix::output_armed_stabilizing()
     if (counter2 > 100) {
         counter2 = 0;
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.5f %5.5f %5.5f %5.5f", throttle_thrust_best_rpy, thr_adj, rpy_scale, _thrust_rpyt_out[0]);
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.3f %5.3f %5.3f", roll_thrust, pitch_thrust, yaw_thrust);
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.3f %5.3f %5.3f", roll_thrust, pitch_thrust, yaw_thrust);
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "%5.3f %5.3f %5.3f %5.3f", _thrust_rpyt_out[0], _thrust_rpyt_out[1], _thrust_rpyt_out[2], _thrust_rpyt_out[3]);
-        AP::logger().Write("RPY", "TimeUS,RollThrust,PitchThrust,YawThrust", "Qfff",
-                                        AP_HAL::micros64(),
-                                        roll_thrust,
-                                        pitch_thrust,
-                                        yaw_thrust);
 
     }
+
+    AP::logger().Write("RPY", "TimeUS,RollThrust,PitchThrust,YawThrust", "Qfff",
+                                AP_HAL::micros64(),
+                                roll_thrust,
+                                pitch_thrust,
+                                yaw_thrust);
 
     // If thrust boost is active then do not limit maximum thrust
     /*throttle_thrust_max = _thrust_boost_ratio + (1.0f - _thrust_boost_ratio) * _throttle_thrust_max * compensation_gain;
@@ -545,10 +546,18 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
         case MOTOR_FRAME_QUAD:
             switch (frame_type) {
                 case MOTOR_FRAME_TYPE_PLUS: // change
-                    add_motor_raw(AP_MOTORS_MOT_1, 0.0f, 1.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 2);
-                    add_motor_raw(AP_MOTORS_MOT_2, 0.0f, -1.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 4);
-                    add_motor_raw(AP_MOTORS_MOT_3, -1.0f, 0.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  1);
-                    add_motor_raw(AP_MOTORS_MOT_4, 1.0f, 0.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  3);
+                    if (rpy_reversed == 1) {
+                        add_motor_raw(AP_MOTORS_MOT_1, 0.0f, -1.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 2);
+                        add_motor_raw(AP_MOTORS_MOT_2, 0.0f, 1.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 4);
+                        add_motor_raw(AP_MOTORS_MOT_3, 1.0f, 0.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  1);
+                        add_motor_raw(AP_MOTORS_MOT_4, -1.0f, 0.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  3);
+                    }
+                    else {
+                        add_motor_raw(AP_MOTORS_MOT_1, 0.0f, 1.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 2);
+                        add_motor_raw(AP_MOTORS_MOT_2, 0.0f, -1.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 4);
+                        add_motor_raw(AP_MOTORS_MOT_3, -1.0f, 0.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  1);
+                        add_motor_raw(AP_MOTORS_MOT_4, 1.0f, 0.0f, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  3);
+                    }
                     break;
                 case MOTOR_FRAME_TYPE_X:
                     add_motor(AP_MOTORS_MOT_1,   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 1);

@@ -28,6 +28,9 @@
 // spool definition
 #define AP_MOTORS_SPOOL_UP_TIME_DEFAULT 0.5f    // time (in seconds) for throttle to increase from zero to min throttle, and min throttle to full throttle.
 
+#define AP_MOTORS_RPY_REVERSED_DEFAULT       0
+
+
 /// @class      AP_MotorsMulticopter
 class AP_MotorsMulticopter : public AP_Motors {
 public:
@@ -95,6 +98,8 @@ public:
     
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo        var_info[];
+
+    AP_Int8         rpy_reversed;
 
 protected:
 
