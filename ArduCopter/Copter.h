@@ -225,6 +225,7 @@ public:
     friend class ModeThrow;
     friend class ModeZigZag;
     friend class ModeAutorotate;
+    friend class ModeRTLNoGPS;
 
     Copter(void);
 
@@ -894,6 +895,9 @@ private:
 #endif
 #endif
     ModeAltHold mode_althold;
+
+    ModeRTLNoGPS mode_rtl_nogps;
+    
 #if MODE_AUTO_ENABLED == ENABLED
     ModeAuto mode_auto;
 #endif
