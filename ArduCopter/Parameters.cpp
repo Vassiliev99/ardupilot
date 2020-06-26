@@ -36,6 +36,20 @@
 #endif
 
 const AP_Param::Info Copter::var_info[] = {
+    // @Param: RTL_NOGPS_PITCH
+    // @DisplayName: RTL_NoGPS pitch
+    // @Description: RTL_NoGPS pitch
+    // @Range: -4500.0f 4500.0f
+    // @User: Advanced
+    GSCALAR(rtl_nogps_pitch, "RTL_NOGPS_PITCH",   RTL_NOGPS_PITCH_DEFAULT),
+
+    // @Param: RTL_NOGPS_CY_DLT
+    // @DisplayName: RTL_NoGPS curr yaw delta
+    // @Description: RTL_NoGPS curr yaw delta
+    // @Range: -180.0f 180.0f
+    // @User: Advanced
+    GSCALAR(rtl_nogps_curr_yaw_delta, "RTL_NOGPS_CY_DLT",   RTL_NOGPS_CURR_YAW_DELTA_DEFAULT),
+
     // @Param: FORMAT_VERSION
     // @DisplayName: Eeprom format version number
     // @Description: This value is incremented when changes are made to the eeprom format
@@ -390,7 +404,7 @@ const AP_Param::Info Copter::var_info[] = {
     // @Param: FS_EKF_ACTION
     // @DisplayName: EKF Failsafe Action
     // @Description: Controls the action that will be taken when an EKF failsafe is invoked
-    // @Values: 1:Land, 2:AltHold, 3:Land even in Stabilize
+    // @Values: 1:Land, 2:AltHold, 3:Land even in Stabilize, 4:RTL_NoGPS
     // @User: Advanced
     GSCALAR(fs_ekf_action, "FS_EKF_ACTION",    FS_EKF_ACTION_DEFAULT),
 

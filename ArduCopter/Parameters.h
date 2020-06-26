@@ -374,7 +374,13 @@ public:
 
         // the k_param_* space is 9-bits in size
         // 511: reserved
+
+        k_param_rtl_nogps_pitch = 258,
+        k_param_rtl_nogps_curr_yaw_delta,
     };
+
+    AP_Float        rtl_nogps_pitch;
+    AP_Float        rtl_nogps_curr_yaw_delta;
 
     AP_Int16        format_version;
 

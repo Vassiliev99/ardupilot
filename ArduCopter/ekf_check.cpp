@@ -166,6 +166,9 @@ void Copter::failsafe_ekf_event()
 
     // take action based on fs_ekf_action parameter
     switch (g.fs_ekf_action) {
+        case FS_EKF_ACTION_RTL_NOGPS:
+            set_mode(Mode::Number::RTL_NOGPS, ModeReason::EKF_FAILSAFE);
+            break;
         case FS_EKF_ACTION_ALTHOLD:
             // AltHold
             if (failsafe.radio || !set_mode(Mode::Number::ALT_HOLD, ModeReason::EKF_FAILSAFE)) {
