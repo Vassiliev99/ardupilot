@@ -82,7 +82,7 @@ float Copter::get_pilot_desired_climb_rate(float throttle_control)
 {
     // throttle failsafe check
     if (failsafe.radio || !ap.rc_receiver_present) {
-        //return 0.0f;
+        return 0.0f;
     }
 
 #if TOY_MODE_ENABLED == ENABLED

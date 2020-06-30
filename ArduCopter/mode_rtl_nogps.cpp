@@ -18,19 +18,19 @@ bool ModeRTLNoGPS::init(bool ignore_checks)
         return false;
     }
 
-    Location home_loc, curr_loc;
-    home_loc = ahrs.get_home();
-    if (!ahrs.get_position(curr_loc)) {  //TODO change to last valid position after tests
-        gcs().send_text(MAV_SEVERITY_WARNING, "Could not get current position");
+    if (!copter.last_valid_loc_ms) {
+        gcs().send_text(MAV_SEVERITY_WARNING, "No valid location");
         return false;
     }
 
+    Location home_loc = ahrs.get_home();
     const float int_loc_to_rad = M_PI / 10000000.0f / 180.0f;
     float home_lat = home_loc.lat * int_loc_to_rad;
     float home_lng = home_loc.lng * int_loc_to_rad;
-    float curr_lat = curr_loc.lat * int_loc_to_rad;
-    float curr_lng = curr_loc.lng * int_loc_to_rad;
+    float curr_lat = copter.last_valid_loc.lat * int_loc_to_rad;
+    float curr_lng = copter.last_valid_loc.lng * int_loc_to_rad;
     _azimuth = wrap_360(atan2f(sinf(home_lng - curr_lng) * cosf(home_lat), cosf(curr_lat) * sinf(home_lat) - sinf(curr_lat) * cosf(home_lat) * cosf(home_lng - curr_lng)) / M_PI * 180.0f);
+    _yaw_ready_ms = 0;
 
     //auto_yaw.set_fixed_yaw(_azimuth, 0.0f, 0, false);
 
@@ -48,18 +48,21 @@ void ModeRTLNoGPS::run()
     // --------------- FROM ALTHOLD END ---------------
 
 
-
     float target_roll = 0.0f, target_pitch = 0.0f, target_yaw = _azimuth * 100.0f;
     float target_climb_rate = 0.0f;
 
-    float curr_yaw = wrap_360(AP::ahrs().get_yaw() / M_PI * 180.0f);
+    float curr_yaw = wrap_360(ahrs.get_yaw() / M_PI * 180.0f);
 
     // check if copter turned to correct yaw (azimuth to home) and ready to fly by pitch 
     float yaw_error = abs(_azimuth - curr_yaw);
     if (yaw_error > 180.0f) {
         yaw_error = 360.0f - yaw_error;
     } 
-    if (yaw_error < g.rtl_nogps_curr_yaw_delta) {
+    if (!_yaw_ready_ms && yaw_error < g.rtl_nogps_curr_yaw_delta) {
+        _yaw_ready_ms = millis();
+    }
+
+    if (_yaw_ready_ms && millis() - _yaw_ready_ms > 5000) {
         target_pitch = g.rtl_nogps_pitch;
     }
 
@@ -72,7 +75,10 @@ void ModeRTLNoGPS::run()
         //gcs().send_text(MAV_SEVERITY_WARNING, "az cur y p %5.5f %5.5f %5.5f %5.5f", _azimuth, curr_yaw, target_yaw_rate, target_pitch);
         //gcs().send_text(MAV_SEVERITY_INFO, "py %5.5f %5.5f", target_pitch, target_yaw_rate);
         //gcs().send_text(MAV_SEVERITY_INFO, "%5.5f %5.5f %5.5f", _azimuth, curr_yaw, target_climb_rate);
+        //gcs().send_text(MAV_SEVERITY_INFO, "%d %d", millis(), _yaw_ready_ms);
     }
+
+    
 
 
     // -------------- FROM ALTHOLD START --------------

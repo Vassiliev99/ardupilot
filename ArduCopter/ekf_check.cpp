@@ -46,6 +46,12 @@ void Copter::ekf_check()
         return;
     }
 
+    
+    if (ahrs.getGpsGlitchStatus()) {
+        failsafe_ekf_event();
+    }
+
+
     // compare compass and velocity variance vs threshold
     if (ekf_over_threshold()) {
         // if compass is not yet flagged as bad
@@ -89,6 +95,20 @@ void Copter::ekf_check()
                 failsafe_ekf_off_event();
             }
         }
+
+        if (!ekf_check_state.bad_variance && !ahrs.getGpsGlitchStatus()) {
+            if (ahrs.get_location(copter.last_valid_loc)) {
+                copter.last_valid_loc_ms = millis();
+            }
+        }
+    }
+
+    static int counter = 0;
+    counter++;
+    if (counter > 100) {
+        counter = 0;
+        gcs().send_text(MAV_SEVERITY_INFO, "valid loc %d %d, ms %d %d", copter.last_valid_loc.lat, copter.last_valid_loc.lng, copter.last_valid_loc_ms, ahrs.getGpsGlitchStatus());
+
     }
 
     // set AP_Notify flags

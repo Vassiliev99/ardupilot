@@ -1521,5 +1521,6 @@ protected:
 private:
 
     float _azimuth;
+    uint32_t _yaw_ready_ms;
 
 };
