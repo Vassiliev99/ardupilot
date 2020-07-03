@@ -453,10 +453,6 @@ private:
     // Current location of the vehicle (altitude is relative to home)
     Location current_loc;
 
-    Location last_valid_loc_older;
-    Location last_valid_loc_newer;
-    uint32_t last_valid_loc_newer_ms;
-
     // Inertial Navigation
     AP_InertialNav_NavEKF inertial_nav;
 
@@ -697,6 +693,15 @@ private:
     void failsafe_ekf_off_event(void);
     void check_ekf_reset();
     void check_vibration();
+
+    void check_gps_position();
+    void check_gps_failsafe();
+    bool check_gps_initialised;
+    bool gps_glitching;
+    Location gps_last_good_loc;
+    Vector3f gps_last_good_vel;
+    uint32_t gps_last_good_update_ms;
+
 
     // esc_calibration.cpp
     void esc_calibration_startup_check();

@@ -18,7 +18,7 @@ bool ModeRTLNoGPS::init(bool ignore_checks)
         return false;
     }
 
-    if (!copter.last_valid_loc_ms) {
+    if (!copter.gps_last_good_update_ms) {
         gcs().send_text(MAV_SEVERITY_WARNING, "No valid location");
         return false;
     }
@@ -27,8 +27,8 @@ bool ModeRTLNoGPS::init(bool ignore_checks)
     const float int_loc_to_rad = M_PI / 10000000.0f / 180.0f;
     float home_lat = home_loc.lat * int_loc_to_rad;
     float home_lng = home_loc.lng * int_loc_to_rad;
-    float curr_lat = copter.last_valid_loc.lat * int_loc_to_rad;
-    float curr_lng = copter.last_valid_loc.lng * int_loc_to_rad;
+    float curr_lat = copter.gps_last_good_loc.lat * int_loc_to_rad;
+    float curr_lng = copter.gps_last_good_loc.lng * int_loc_to_rad;
     _azimuth = wrap_360(atan2f(sinf(home_lng - curr_lng) * cosf(home_lat), cosf(curr_lat) * sinf(home_lat) - sinf(curr_lat) * cosf(home_lat) * cosf(home_lng - curr_lng)) / M_PI * 180.0f);
     _yaw_ready_ms = 0;
 

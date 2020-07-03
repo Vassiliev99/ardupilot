@@ -15,6 +15,7 @@
  # define EKF_CHECK_WARNING_TIME            (30*1000)   // warning text messages are sent to ground no more than every 30 seconds
 #endif
 
+
 ////////////////////////////////////////////////////////////////////////////////
 // EKF_check structure
 ////////////////////////////////////////////////////////////////////////////////
@@ -45,6 +46,10 @@ void Copter::ekf_check()
         failsafe_ekf_off_event();   // clear failsafe
         return;
     }
+
+
+    check_gps_position();
+    check_gps_failsafe();
 
     
     //if (ahrs.getGpsGlitchStatus()) {
@@ -97,14 +102,14 @@ void Copter::ekf_check()
         }
 
         // save valid location every 30 secs so last_valid_loc_older always in [30, 30*2) sec interval
-        if (!ekf_check_state.bad_variance) {
+        /*if (!ekf_check_state.bad_variance) {
             if (millis() - copter.last_valid_loc_newer_ms > 30000) { // TODO 30sec add to params
                 copter.last_valid_loc_older = copter.last_valid_loc_newer;
                 if (ahrs.get_location(copter.last_valid_loc_newer)) {
                     copter.last_valid_loc_newer_ms = millis();
                 }
             }
-        }
+        }*/
     }
 
     static int counter = 0;
@@ -177,6 +182,122 @@ bool Copter::ekf_over_threshold()
     }
     return true;
 }
+
+
+// ------------- OLD GPS FAILSAFE ---------------
+
+void Copter::check_gps_position() {
+    uint32_t now = millis();        // current system time
+    float sane_dt;                  // time since last sane gps reading
+    float accel_based_distance;     // movement based on max acceleration
+    Location curr_pos;              // our current position estimate
+    Location gps_pos;               // gps reported position
+    float distance_cm;              // distance from gps to current position estimate in cm
+    bool all_ok;                    // true if the new gps position passes sanity checks
+
+    // exit immediately if we don't have gps lock
+    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
+        copter.gps_glitching = true;
+        return;
+    }
+
+    // if not initialised or disabled update last good position and exit
+    if (!copter.check_gps_initialised) {
+        copter.gps_last_good_loc = gps.location();
+        copter.gps_last_good_vel = gps.velocity();
+        copter.gps_last_good_update_ms = now;
+        copter.check_gps_initialised = true;
+        copter.gps_glitching = false;
+        return;
+    }
+
+    // calculate time since last sane gps reading in ms
+    sane_dt = (now - copter.gps_last_good_update_ms) / 1000.0f;
+
+    // project forward our position from last known velocity
+    curr_pos = copter.gps_last_good_loc;
+    curr_pos.offset(copter.gps_last_good_vel.x * sane_dt, copter.gps_last_good_vel.y * sane_dt);
+
+    // calculate distance from recent gps position to current estimate
+    gps_pos = gps.location();
+    distance_cm = curr_pos.get_distance(gps_pos) * 100.0f;
+
+    // all ok if within a given hardcoded radius
+    if (distance_cm <= 200.0f) { //TODO add to params
+        all_ok = true;
+    }else{
+        // or if within the maximum distance we could have moved based on our acceleration
+        accel_based_distance = 0.5f * 1000.0f * sane_dt * sane_dt; //TODO add to params _accel_max_cmss = 1000.0f
+        all_ok = (distance_cm <= accel_based_distance);
+    }
+
+    // store updates to gps position
+    if (all_ok) {
+        // position is acceptable
+        copter.gps_last_good_update_ms = now;
+        copter.gps_last_good_loc = gps_pos;
+        copter.gps_last_good_vel = gps.velocity();
+    }
+    
+    // update glitching flag
+    copter.gps_glitching = !all_ok;
+}
+
+// failsafe_gps_check - check for gps failsafe
+void Copter::check_gps_failsafe()
+{
+    uint32_t last_gps_update_ms;
+
+    // return immediately if gps failsafe is disabled or we have never had GPS lock
+    if (!AP::ahrs().home_is_set()) { //TODO add param to disable
+        // if we have just disabled the gps failsafe, ensure the gps failsafe event is cleared
+        if (failsafe.ekf) {
+            failsafe_ekf_off_event();
+        }
+        return;
+    }
+
+    // calc time since last gps update
+    last_gps_update_ms = millis() - copter.gps_last_good_update_ms;
+
+    // check if all is well
+    if( last_gps_update_ms < 5000) { //TODO add define FAILSAFE_GPS_TIMEOUT_MS 5000
+        // check for recovery from gps failsafe
+        if (failsafe.ekf) {
+            failsafe_ekf_off_event();
+        }
+        return;
+    }
+
+    // do nothing if gps failsafe already triggered or motors disarmed
+    if (failsafe.ekf || !motors->armed()) {
+        return;
+    }
+
+    // GPS failsafe event has occured
+    // update state, warn the ground station and log to dataflash
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "GPS Failsafe");
+    AP::logger().Write_Error(LogErrorSubsystem::FAILSAFE_GPS, LogErrorCode::FAILSAFE_OCCURRED);
+
+    failsafe_ekf_event();
+
+    /*// take action based on flight mode and FS_GPS_ENABLED parameter
+    if (mode_requires_GPS(control_mode) || g.failsafe_gps_enabled == FS_GPS_LAND_EVEN_STABILIZE) {
+        if (g.failsafe_gps_enabled == FS_GPS_ALTHOLD && !failsafe.radio) {
+            set_mode(ALT_HOLD);
+        }else{
+            set_mode_land_with_pause();
+        }
+    }
+
+    // if flight mode is LAND ensure it's not the GPS controlled LAND
+    if (control_mode == LAND) {
+        land_do_not_use_GPS();
+    }*/
+}
+
+
+// -------------------------------------------
 
 
 // failsafe_ekf_event - perform ekf failsafe
