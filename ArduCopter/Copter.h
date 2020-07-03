@@ -453,8 +453,9 @@ private:
     // Current location of the vehicle (altitude is relative to home)
     Location current_loc;
 
-    Location last_valid_loc;
-    uint32_t last_valid_loc_ms;
+    Location last_valid_loc_older;
+    Location last_valid_loc_newer;
+    uint32_t last_valid_loc_newer_ms;
 
     // Inertial Navigation
     AP_InertialNav_NavEKF inertial_nav;

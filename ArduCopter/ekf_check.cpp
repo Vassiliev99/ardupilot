@@ -47,9 +47,9 @@ void Copter::ekf_check()
     }
 
     
-    if (ahrs.getGpsGlitchStatus()) {
-        failsafe_ekf_event();
-    }
+    //if (ahrs.getGpsGlitchStatus()) {
+    //    failsafe_ekf_event();
+    //}
 
 
     // compare compass and velocity variance vs threshold
@@ -96,9 +96,13 @@ void Copter::ekf_check()
             }
         }
 
-        if (!ekf_check_state.bad_variance && !ahrs.getGpsGlitchStatus()) {
-            if (ahrs.get_location(copter.last_valid_loc)) {
-                copter.last_valid_loc_ms = millis();
+        // save valid location every 30 secs so last_valid_loc_older always in [30, 30*2) sec interval
+        if (!ekf_check_state.bad_variance) {
+            if (millis() - copter.last_valid_loc_newer_ms > 30000) { // TODO 30sec add to params
+                copter.last_valid_loc_older = copter.last_valid_loc_newer;
+                if (ahrs.get_location(copter.last_valid_loc_newer)) {
+                    copter.last_valid_loc_newer_ms = millis();
+                }
             }
         }
     }
@@ -107,7 +111,7 @@ void Copter::ekf_check()
     counter++;
     if (counter > 100) {
         counter = 0;
-        gcs().send_text(MAV_SEVERITY_INFO, "valid loc %d %d, ms %d %d", copter.last_valid_loc.lat, copter.last_valid_loc.lng, copter.last_valid_loc_ms, ahrs.getGpsGlitchStatus());
+        //gcs().send_text(MAV_SEVERITY_INFO, "valid loc %d %d, ms %d %d", copter.last_valid_loc.lat, copter.last_valid_loc.lng, copter.last_valid_loc_ms, ahrs.getGpsGlitchStatus());
 
     }
 
@@ -132,6 +136,20 @@ bool Copter::ekf_over_threshold()
     ahrs.get_variances(vel_variance, position_variance, height_variance, mag_variance, tas_variance, offset);
 
     const float mag_max = fmaxf(fmaxf(mag_variance.x,mag_variance.y),mag_variance.z);
+
+    static int counter = 0;
+    counter++;
+    if (counter > 10) {
+        counter = 0;
+        gcs().send_text(MAV_SEVERITY_INFO, "%5.5f %5.5f %5.5f %5.5f", vel_variance, position_variance, height_variance, mag_max);
+
+    }
+
+    /*if (position_variance > 1.0f) { // TODO choose value
+        gcs().send_text(MAV_SEVERITY_WARNING, "Problems with GPS position%5.5f", position_variance);
+        AP::logger().Write("EKFP", "TimeUS,PosVar", "Qf", AP_HAL::micros64(), position_variance);
+        return true;
+    }*/
 
     // return true if two of compass, velocity and position variances are over the threshold OR velocity variance is twice the threshold
     uint8_t over_thresh_count = 0;
