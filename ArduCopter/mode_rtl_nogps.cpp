@@ -24,13 +24,17 @@ bool ModeRTLNoGPS::init(bool ignore_checks)
     }
 
     Location home_loc = ahrs.get_home();
-    const float int_loc_to_rad = M_PI / 10000000.0f / 180.0f;
+    /*const float int_loc_to_rad = M_PI / 10000000.0f / 180.0f;
     float home_lat = home_loc.lat * int_loc_to_rad;
     float home_lng = home_loc.lng * int_loc_to_rad;
     float curr_lat = copter.gps_last_good_loc.lat * int_loc_to_rad;
     float curr_lng = copter.gps_last_good_loc.lng * int_loc_to_rad;
     _azimuth = wrap_360(atan2f(sinf(home_lng - curr_lng) * cosf(home_lat), cosf(curr_lat) * sinf(home_lat) - sinf(curr_lat) * cosf(home_lat) * cosf(home_lng - curr_lng)) / M_PI * 180.0f);
+    */
+    _azimuth = copter.gps_last_good_loc.get_bearing_to(home_loc) / 100.0f;
     _yaw_ready_ms = 0;
+
+    gcs().send_text(MAV_SEVERITY_INFO, "Azimuth to home: %3.3f", _azimuth);
 
     //auto_yaw.set_fixed_yaw(_azimuth, 0.0f, 0, false);
 

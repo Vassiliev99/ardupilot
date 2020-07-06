@@ -697,7 +697,7 @@ private:
     void check_gps_position();
     void check_gps_failsafe();
     bool check_gps_initialised;
-    bool gps_glitching;
+    bool gps_glitch;
     Location gps_last_good_loc;
     Vector3f gps_last_good_vel;
     uint32_t gps_last_good_update_ms;

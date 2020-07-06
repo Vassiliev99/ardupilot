@@ -146,7 +146,8 @@ bool Copter::ekf_over_threshold()
     counter++;
     if (counter > 10) {
         counter = 0;
-        gcs().send_text(MAV_SEVERITY_INFO, "%5.5f %5.5f %5.5f %5.5f", vel_variance, position_variance, height_variance, mag_max);
+        //gcs().send_text(MAV_SEVERITY_INFO, "%5.5f %5.5f %5.5f %5.5f", vel_variance, position_variance, height_variance, mag_max);
+        gcs().send_text(MAV_SEVERITY_INFO, "%d %d %d", copter.gps_last_good_loc.lat, copter.gps_last_good_loc.lng, copter.gps_last_good_update_ms);
 
     }
 
@@ -197,7 +198,7 @@ void Copter::check_gps_position() {
 
     // exit immediately if we don't have gps lock
     if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
-        copter.gps_glitching = true;
+        copter.gps_glitch = true;
         return;
     }
 
@@ -207,7 +208,7 @@ void Copter::check_gps_position() {
         copter.gps_last_good_vel = gps.velocity();
         copter.gps_last_good_update_ms = now;
         copter.check_gps_initialised = true;
-        copter.gps_glitching = false;
+        copter.gps_glitch = false;
         return;
     }
 
@@ -240,7 +241,7 @@ void Copter::check_gps_position() {
     }
     
     // update glitching flag
-    copter.gps_glitching = !all_ok;
+    copter.gps_glitch = !all_ok;
 }
 
 // failsafe_gps_check - check for gps failsafe
@@ -252,6 +253,7 @@ void Copter::check_gps_failsafe()
     if (!AP::ahrs().home_is_set()) { //TODO add param to disable
         // if we have just disabled the gps failsafe, ensure the gps failsafe event is cleared
         if (failsafe.ekf) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "GPS Failsafe resolved");
             failsafe_ekf_off_event();
         }
         return;
@@ -261,9 +263,10 @@ void Copter::check_gps_failsafe()
     last_gps_update_ms = millis() - copter.gps_last_good_update_ms;
 
     // check if all is well
-    if( last_gps_update_ms < 5000) { //TODO add define FAILSAFE_GPS_TIMEOUT_MS 5000
+    if (last_gps_update_ms < 5000) { //TODO add define FAILSAFE_GPS_TIMEOUT_MS 5000
         // check for recovery from gps failsafe
         if (failsafe.ekf) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "GPS Failsafe resolved");
             failsafe_ekf_off_event();
         }
         return;
@@ -326,8 +329,18 @@ void Copter::failsafe_ekf_event()
     // take action based on fs_ekf_action parameter
     switch (g.fs_ekf_action) {
         case FS_EKF_ACTION_RTL_NOGPS:
-            set_mode(Mode::Number::RTL_NOGPS, ModeReason::EKF_FAILSAFE);
-            break;
+            {
+                Location home_loc = ahrs.get_home();
+                if (copter.gps_last_good_loc.get_distance(home_loc) < 500) {
+                    if (failsafe.radio || !set_mode(Mode::Number::ALT_HOLD, ModeReason::EKF_FAILSAFE)) {
+                        set_mode_land_with_pause(ModeReason::EKF_FAILSAFE);
+                    }
+                }
+                else {
+                    set_mode(Mode::Number::RTL_NOGPS, ModeReason::EKF_FAILSAFE);
+                }
+                break;
+            }
         case FS_EKF_ACTION_ALTHOLD:
             // AltHold
             if (failsafe.radio || !set_mode(Mode::Number::ALT_HOLD, ModeReason::EKF_FAILSAFE)) {
