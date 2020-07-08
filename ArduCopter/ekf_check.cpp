@@ -51,10 +51,6 @@ void Copter::ekf_check()
     check_gps_position();
     check_gps_failsafe();
 
-    
-    //if (ahrs.getGpsGlitchStatus()) {
-    //    failsafe_ekf_event();
-    //}
 
 
     // compare compass and velocity variance vs threshold
@@ -100,23 +96,76 @@ void Copter::ekf_check()
                 failsafe_ekf_off_event();
             }
         }
-
-        // save valid location every 30 secs so last_valid_loc_older always in [30, 30*2) sec interval
-        /*if (!ekf_check_state.bad_variance) {
-            if (millis() - copter.last_valid_loc_newer_ms > 30000) { // TODO 30sec add to params
-                copter.last_valid_loc_older = copter.last_valid_loc_newer;
-                if (ahrs.get_location(copter.last_valid_loc_newer)) {
-                    copter.last_valid_loc_newer_ms = millis();
-                }
-            }
-        }*/
     }
 
     static int counter = 0;
     counter++;
-    if (counter > 100) {
+    if (counter == 10) {
         counter = 0;
-        //gcs().send_text(MAV_SEVERITY_INFO, "valid loc %d %d, ms %d %d", copter.last_valid_loc.lat, copter.last_valid_loc.lng, copter.last_valid_loc_ms, ahrs.getGpsGlitchStatus());
+        //Vector3f angles = attitude_control->get_att_target_euler_cd();
+        //gcs().send_text(MAV_SEVERITY_INFO, "angles %5.5f %5.5f %5.5f", angles.x / 100.0f, angles.y / 100.0f, angles.z / 100.0f);
+        //Vector3f accel = ahrs.get_accel_ef();
+        //gcs().send_text(MAV_SEVERITY_INFO, "accel %5.5f %5.5f %5.5f", accel.x, accel.y, accel.z);
+        //Vector3f accbl = ahrs.get_accel_ef_blended();
+        //gcs().send_text(MAV_SEVERITY_INFO, "accbl %5.5f %5.5f %5.5f", accbl.x, accbl.y, accbl.z);
+
+        //
+        //float roll = degrees(ahrs.get_roll());
+        //float pitch = degrees(ahrs.get_pitch());
+        
+        //gcs().send_text(MAV_SEVERITY_INFO, "rpy %5.5f %5.5f %5.5f", roll, pitch, yaw);
+        
+
+    }
+
+    Vector3f vel;
+    if (ahrs.get_velocity_NED(vel)) {
+        float vel_e = vel.y;
+        float vel_n = vel.x;
+        // combined horizontal velocity (east north)
+        float vel_ne = sqrtf(vel_e * vel_e + vel_n * vel_n);
+        // calculate velocity angle
+        float vel_ang = degrees(atanf(abs(vel_e) / abs(vel_n)));
+        if (vel_e >= 0) {
+            if (vel_n <= 0) { vel_ang = 180.0f - vel_ang; }
+        }
+        else {
+            if (vel_n <= 0) { vel_ang = 180.0f + vel_ang; }
+            else { vel_ang = 360.0f - vel_ang; }
+        }
+
+        float roll = degrees(get_roll());
+        float pitch = degrees(get_pitch());
+        float yaw = degrees(wrap_2PI(ahrs.get_yaw()));
+
+        //velocity angle regarding roll and pitch
+        float vel_ang_rp = wrap_360(vel_ang - yaw);
+        //velocity by roll and pitch
+        float vel_r, vel_p, alpha;
+        if (0.0f <= vel_ang_rp && vel_ang_rp < 90.0f) {
+            alpha = radians(vel_ang_rp);
+            vel_r = vel_ne * sinf(alpha);
+            vel_p = vel_ne * cosf(alpha);
+        }
+        else if (90.0f <= vel_ang_rp && vel_ang_rp < 180.0f) {
+            alpha = radians(vel_ang_rp - 90.0f);
+            vel_r = vel_ne * cosf(alpha);
+            vel_p = - vel_ne * sinf(alpha);
+        }
+        else if (180.0f <= vel_ang_rp && vel_ang_rp < 270.0f) {
+            alpha = radians(vel_ang_rp - 180.0f);
+            vel_r = - vel_ne * sinf(alpha);
+            vel_p = - vel_ne * cosf(alpha);
+        }
+        else {
+            alpha = radians(vel_ang_rp - 270.0f);
+            vel_r = - vel_ne * cosf(alpha);
+            vel_p = vel_ne * sinf(alpha);
+        }
+
+        if (counter == 9) {
+            gcs().send_text(MAV_SEVERITY_INFO, "r %5.5f %5.5f; p %5.5f %5.5f", roll, vel_r, pitch, vel_p);
+        }
 
     }
 
@@ -147,7 +196,7 @@ bool Copter::ekf_over_threshold()
     if (counter > 10) {
         counter = 0;
         //gcs().send_text(MAV_SEVERITY_INFO, "%5.5f %5.5f %5.5f %5.5f", vel_variance, position_variance, height_variance, mag_max);
-        gcs().send_text(MAV_SEVERITY_INFO, "%d %d %d", copter.gps_last_good_loc.lat, copter.gps_last_good_loc.lng, copter.gps_last_good_update_ms);
+        //gcs().send_text(MAV_SEVERITY_INFO, "%d %d %d", copter.gps_last_good_loc.lat, copter.gps_last_good_loc.lng, copter.gps_last_good_update_ms);
 
     }
 
