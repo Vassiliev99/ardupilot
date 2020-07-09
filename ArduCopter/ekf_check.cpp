@@ -50,7 +50,8 @@ void Copter::ekf_check()
 
     check_gps_position();
     check_gps_failsafe();
-
+    accum_wind();
+    calc_wind();
 
 
     // compare compass and velocity variance vs threshold
@@ -96,77 +97,6 @@ void Copter::ekf_check()
                 failsafe_ekf_off_event();
             }
         }
-    }
-
-    static int counter = 0;
-    counter++;
-    if (counter == 10) {
-        counter = 0;
-        //Vector3f angles = attitude_control->get_att_target_euler_cd();
-        //gcs().send_text(MAV_SEVERITY_INFO, "angles %5.5f %5.5f %5.5f", angles.x / 100.0f, angles.y / 100.0f, angles.z / 100.0f);
-        //Vector3f accel = ahrs.get_accel_ef();
-        //gcs().send_text(MAV_SEVERITY_INFO, "accel %5.5f %5.5f %5.5f", accel.x, accel.y, accel.z);
-        //Vector3f accbl = ahrs.get_accel_ef_blended();
-        //gcs().send_text(MAV_SEVERITY_INFO, "accbl %5.5f %5.5f %5.5f", accbl.x, accbl.y, accbl.z);
-
-        //
-        //float roll = degrees(ahrs.get_roll());
-        //float pitch = degrees(ahrs.get_pitch());
-        
-        //gcs().send_text(MAV_SEVERITY_INFO, "rpy %5.5f %5.5f %5.5f", roll, pitch, yaw);
-        
-
-    }
-
-    Vector3f vel;
-    if (ahrs.get_velocity_NED(vel)) {
-        float vel_e = vel.y;
-        float vel_n = vel.x;
-        // combined horizontal velocity (east north)
-        float vel_ne = sqrtf(vel_e * vel_e + vel_n * vel_n);
-        // calculate velocity angle
-        float vel_ang = degrees(atanf(abs(vel_e) / abs(vel_n)));
-        if (vel_e >= 0) {
-            if (vel_n <= 0) { vel_ang = 180.0f - vel_ang; }
-        }
-        else {
-            if (vel_n <= 0) { vel_ang = 180.0f + vel_ang; }
-            else { vel_ang = 360.0f - vel_ang; }
-        }
-
-        float roll = degrees(get_roll());
-        float pitch = degrees(get_pitch());
-        float yaw = degrees(wrap_2PI(ahrs.get_yaw()));
-
-        //velocity angle regarding roll and pitch
-        float vel_ang_rp = wrap_360(vel_ang - yaw);
-        //velocity by roll and pitch
-        float vel_r, vel_p, alpha;
-        if (0.0f <= vel_ang_rp && vel_ang_rp < 90.0f) {
-            alpha = radians(vel_ang_rp);
-            vel_r = vel_ne * sinf(alpha);
-            vel_p = vel_ne * cosf(alpha);
-        }
-        else if (90.0f <= vel_ang_rp && vel_ang_rp < 180.0f) {
-            alpha = radians(vel_ang_rp - 90.0f);
-            vel_r = vel_ne * cosf(alpha);
-            vel_p = - vel_ne * sinf(alpha);
-        }
-        else if (180.0f <= vel_ang_rp && vel_ang_rp < 270.0f) {
-            alpha = radians(vel_ang_rp - 180.0f);
-            vel_r = - vel_ne * sinf(alpha);
-            vel_p = - vel_ne * cosf(alpha);
-        }
-        else {
-            alpha = radians(vel_ang_rp - 270.0f);
-            vel_r = - vel_ne * cosf(alpha);
-            vel_p = vel_ne * sinf(alpha);
-        }
-
-        if (counter == 9) {
-            gcs().send_text(MAV_SEVERITY_INFO, "r %5.5f %5.5f; p %5.5f %5.5f", roll, vel_r, pitch, vel_p);
-        }
-
     }
 
     // set AP_Notify flags
@@ -350,6 +280,157 @@ void Copter::check_gps_failsafe()
 
 
 // -------------------------------------------
+
+
+void Copter::accum_wind() {
+    // initialise wind variables
+    if (!copter.accum_wind_initialised) {
+        copter.wind_data_last_item = 0;
+        copter.wind_data_total_items = 0;
+        copter.accum_wind_initialised = true;
+
+        return;
+    } //TODO remove
+
+    static int counter = 0;
+    counter = (counter + 1) % 10;
+
+    if (copter.wind_data_last_item != 0 && millis() - copter.wind_data[copter.wind_data_last_item].ms < 1000) { //TODO change 1000?
+        return;
+    }
+
+    Vector3f vel;
+    if (!ahrs.get_velocity_NED(vel)) {
+        gcs().send_text(MAV_SEVERITY_WARNING, "Can not get velocity for wind calculation");
+        return;
+    }
+
+    // check if flight is stable without accelerations
+    Vector3f accel = ahrs.get_accel_ef();
+    if (abs(accel.x) > 0.1f || abs(accel.y) > 0.1f) { // TODO is it required?
+        return;
+    }
+
+    // copter velocity (east north)
+    float vel_e = vel.y;
+    float vel_n = vel.x;
+    // combined horizontal velocity (both east and north)
+    float vel_ne = sqrtf(vel_e * vel_e + vel_n * vel_n);
+    // velocity angle (0 - 360)
+    float vel_ang = degrees(atanf(abs(vel_e) / abs(vel_n)));
+    if (vel_e >= 0) {
+        if (vel_n <= 0) { vel_ang = 180.0f - vel_ang; }
+    }
+    else {
+        if (vel_n <= 0) { vel_ang = 180.0f + vel_ang; }
+        else { vel_ang = 360.0f - vel_ang; }
+    }
+
+    float roll = degrees(ahrs.get_roll()); // -180 - 180
+    float pitch = degrees(ahrs.get_pitch()); // -180 - 180
+    float yaw = degrees(wrap_2PI(ahrs.get_yaw())); // 0 - 360
+    // reverse pitch so it will be positive on forward flight 
+    pitch = - pitch;
+
+    //velocity angle regarding roll and pitch
+    float vel_ang_rp = wrap_360(vel_ang - yaw);
+    // calculate velocity by roll and pitch
+    float vel_r, vel_p, alpha;
+    if (0.0f <= vel_ang_rp && vel_ang_rp < 90.0f) {
+        alpha = radians(vel_ang_rp);
+        vel_r = vel_ne * sinf(alpha);
+        vel_p = vel_ne * cosf(alpha);
+    }
+    else if (90.0f <= vel_ang_rp && vel_ang_rp < 180.0f) {
+        alpha = radians(vel_ang_rp - 90.0f);
+        vel_r = vel_ne * cosf(alpha);
+        vel_p = - vel_ne * sinf(alpha);
+    }
+    else if (180.0f <= vel_ang_rp && vel_ang_rp < 270.0f) {
+        alpha = radians(vel_ang_rp - 180.0f);
+        vel_r = - vel_ne * sinf(alpha);
+        vel_p = - vel_ne * cosf(alpha);
+    }
+    else {
+        alpha = radians(vel_ang_rp - 270.0f);
+        vel_r = - vel_ne * cosf(alpha);
+        vel_p = vel_ne * sinf(alpha);
+    }
+    
+    if (counter == 9) {
+        gcs().send_text(MAV_SEVERITY_INFO, "r %2.2f %3.3f; p %2.2f %3.3f; y %2.2f", roll, vel_r, pitch, vel_p, yaw);
+    }
+
+    // check if roll velocity near zero
+    // TODO change it
+    if (abs(vel_r) > 0.1f) {
+        return;
+    }
+
+    wind_data_t wd = {millis(), roll, pitch, yaw, vel_r, vel_p};
+    copter.wind_data_last_item = (copter.wind_data_last_item + 1) % 100; // TODO get from param
+    if (copter.wind_data_total_items < 100) { copter.wind_data_total_items += 1; }
+    copter.wind_data[copter.wind_data_last_item] = wd;
+}
+
+void Copter::calc_wind() {
+    static int counter2 = 0;
+    counter2 = (counter2 + 1) % 10;
+
+    if (!copter.accum_wind_initialised) {
+        return;
+    }
+
+    // calculate wind vector (east north) from saved values
+    float wind_e = 0;
+    float wind_n = 0;
+    for (int i = 0; i < copter.wind_data_total_items; i++) {
+        wind_data_t wd = copter.wind_data[i];
+        float alpha;
+        if (0.0f <= wd.yaw && wd.yaw < 90.0f) {
+            alpha = radians(wd.yaw);
+            wind_e += wd.roll * cosf(alpha);
+            wind_n += - wd.roll * sinf(alpha);
+        }
+        else if (90.0f <= wd.yaw && wd.yaw < 180.0f) {
+            alpha = radians(wd.yaw - 90.0f);
+            wind_e += - wd.roll * sinf(alpha);
+            wind_n += - wd.roll * cosf(alpha);
+        }
+        else if (180.0f <= wd.yaw && wd.yaw < 270.0f) {
+            alpha = radians(wd.yaw - 180.0f);
+            wind_e += - wd.roll * cosf(alpha);
+            wind_n += wd.roll * sinf(alpha);
+        }
+        else {
+            alpha = radians(wd.yaw - 270.0f);
+            wind_e += wd.roll * sinf(alpha);
+            wind_n += wd.roll * cosf(alpha);
+        }
+    }
+
+    // calculate wind angle from wind vector
+    float wind_ang;
+    if (is_zero(wind_n)) {
+        if (is_zero(wind_e)) { wind_ang = 0.0f; } // TODO ?
+        else if (wind_e > 0.0f) { wind_ang = 90.0f; }
+        else { wind_ang = 270.0f; }
+    }
+    else {
+        wind_ang = degrees(atanf(abs(wind_e) / abs(wind_n)));
+        if (wind_e >= 0.0f) {
+            if (wind_n <= 0.0f) { wind_ang = 180.0f - wind_ang; }
+        }
+        else {
+            if (wind_n <= 0.0f) { wind_ang = 180.0f + wind_ang; }
+            else { wind_ang = 360.0f - wind_ang; }
+        }
+        if (counter2 == 9) {
+            gcs().send_text(MAV_SEVERITY_INFO, "wind ang %3.3f; n %3.3f e %3.3f", wind_ang, wind_n, wind_e);
+        }
+    }
+
+}
 
 
 // failsafe_ekf_event - perform ekf failsafe

@@ -702,6 +702,22 @@ private:
     Vector3f gps_last_good_vel;
     uint32_t gps_last_good_update_ms;
 
+    void accum_wind();
+    void calc_wind();
+    bool accum_wind_initialised;
+    typedef struct {
+        uint32_t ms;
+        float roll;
+        float pitch;
+        float yaw;
+        float vel_r;
+        float vel_p;
+
+    } wind_data_t;
+    wind_data_t wind_data[100]; // TODO add 100 to param
+    int wind_data_last_item;
+    int wind_data_total_items;
+
 
     // esc_calibration.cpp
     void esc_calibration_startup_check();
