@@ -712,11 +712,12 @@ private:
         float yaw;
         float vel_r;
         float vel_p;
-
     } wind_data_t;
     wind_data_t wind_data[100]; // TODO add 100 to param
     int wind_data_last_item;
     int wind_data_total_items;
+    float wind_ang;
+    float wind_vel;
 
 
     // esc_calibration.cpp

@@ -229,7 +229,7 @@ void Copter::check_gps_failsafe()
     uint32_t last_gps_update_ms;
 
     // return immediately if gps failsafe is disabled or we have never had GPS lock
-    if (!AP::ahrs().home_is_set()) { //TODO add param to disable
+    if (!AP::ahrs().home_is_set()) { //TODO add param to disable gps failsafe
         // if we have just disabled the gps failsafe, ensure the gps failsafe event is cleared
         if (failsafe.ekf) {
             gcs().send_text(MAV_SEVERITY_CRITICAL, "GPS Failsafe resolved");
@@ -282,6 +282,8 @@ void Copter::check_gps_failsafe()
 // -------------------------------------------
 
 
+// ------------------WIND---------------------
+
 void Copter::accum_wind() {
     // initialise wind variables
     if (!copter.accum_wind_initialised) {
@@ -292,10 +294,7 @@ void Copter::accum_wind() {
         return;
     } //TODO remove
 
-    static int counter = 0;
-    counter = (counter + 1) % 10;
-
-    if (copter.wind_data_last_item != 0 && millis() - copter.wind_data[copter.wind_data_last_item].ms < 1000) { //TODO change 1000?
+    if (copter.wind_data_last_item != 0 && millis() - copter.wind_data[copter.wind_data_last_item].ms < 1000) { //TODO change 1000ms ?
         return;
     }
 
@@ -307,7 +306,8 @@ void Copter::accum_wind() {
 
     // check if flight is stable without accelerations
     Vector3f accel = ahrs.get_accel_ef();
-    if (abs(accel.x) > 0.1f || abs(accel.y) > 0.1f) { // TODO is it required?
+    if (abs(accel.x) > 0.15f || abs(accel.y) > 0.15f) { // TODO is it required?
+        //gcs().send_text(MAV_SEVERITY_INFO, "accel %3.3f %3.3f %3.3f", accel.x, accel.y, accel.z);
         return;
     }
 
@@ -357,27 +357,21 @@ void Copter::accum_wind() {
         vel_p = vel_ne * sinf(alpha);
     }
     
-    if (counter == 9) {
-        gcs().send_text(MAV_SEVERITY_INFO, "r %2.2f %3.3f; p %2.2f %3.3f; y %2.2f", roll, vel_r, pitch, vel_p, yaw);
+    static int counter1 = 0;
+    counter1 = (counter1 + 1) % 5;
+    if (counter1 == 4) {
+        //gcs().send_text(MAV_SEVERITY_INFO, "r %2.2f %3.3f; p %2.2f %3.3f; y %2.2f", roll, vel_r, pitch, vel_p, yaw);
     }
 
-    // check if roll velocity near zero
-    // TODO change it
-    if (abs(vel_r) > 0.1f) {
-        return;
-    }
-
+    // save values for future wind calculation
     wind_data_t wd = {millis(), roll, pitch, yaw, vel_r, vel_p};
-    copter.wind_data_last_item = (copter.wind_data_last_item + 1) % 100; // TODO get from param
+    copter.wind_data_last_item = (copter.wind_data_last_item + 1) % 100; // TODO get 100 from param
     if (copter.wind_data_total_items < 100) { copter.wind_data_total_items += 1; }
     copter.wind_data[copter.wind_data_last_item] = wd;
 }
 
 void Copter::calc_wind() {
-    static int counter2 = 0;
-    counter2 = (counter2 + 1) % 10;
-
-    if (!copter.accum_wind_initialised) {
+    if (!copter.accum_wind_initialised || copter.wind_data_total_items == 0) {
         return;
     }
 
@@ -386,51 +380,60 @@ void Copter::calc_wind() {
     float wind_n = 0;
     for (int i = 0; i < copter.wind_data_total_items; i++) {
         wind_data_t wd = copter.wind_data[i];
+        float roll_wind = wd.roll - wd.vel_r * 3.7f; // TODO coefs
+        float pitch_wind = wd.pitch - wd.vel_p * 3.7f; 
         float alpha;
         if (0.0f <= wd.yaw && wd.yaw < 90.0f) {
             alpha = radians(wd.yaw);
-            wind_e += wd.roll * cosf(alpha);
-            wind_n += - wd.roll * sinf(alpha);
+            wind_e += roll_wind * cosf(alpha) + pitch_wind * sinf(alpha);
+            wind_n += - roll_wind * sinf(alpha) + pitch_wind * cosf(alpha);
         }
         else if (90.0f <= wd.yaw && wd.yaw < 180.0f) {
             alpha = radians(wd.yaw - 90.0f);
-            wind_e += - wd.roll * sinf(alpha);
-            wind_n += - wd.roll * cosf(alpha);
+            wind_e += - roll_wind * sinf(alpha) + pitch_wind * cosf(alpha);
+            wind_n += - roll_wind * cosf(alpha) - pitch_wind * sinf(alpha);
         }
         else if (180.0f <= wd.yaw && wd.yaw < 270.0f) {
             alpha = radians(wd.yaw - 180.0f);
-            wind_e += - wd.roll * cosf(alpha);
-            wind_n += wd.roll * sinf(alpha);
+            wind_e += - roll_wind * cosf(alpha) - pitch_wind * sinf(alpha);
+            wind_n += roll_wind * sinf(alpha) - pitch_wind * cosf(alpha);
         }
         else {
             alpha = radians(wd.yaw - 270.0f);
-            wind_e += wd.roll * sinf(alpha);
-            wind_n += wd.roll * cosf(alpha);
+            wind_e += roll_wind * sinf(alpha) - pitch_wind * cosf(alpha);
+            wind_n += roll_wind * cosf(alpha) + pitch_wind * sinf(alpha);
         }
     }
 
     // calculate wind angle from wind vector
-    float wind_ang;
     if (is_zero(wind_n)) {
-        if (is_zero(wind_e)) { wind_ang = 0.0f; } // TODO ?
-        else if (wind_e > 0.0f) { wind_ang = 90.0f; }
-        else { wind_ang = 270.0f; }
+        if (is_zero(wind_e)) { copter.wind_ang = 0.0f; }
+        else if (wind_e > 0.0f) { copter.wind_ang = 90.0f; }
+        else { copter.wind_ang = 270.0f; }
     }
     else {
-        wind_ang = degrees(atanf(abs(wind_e) / abs(wind_n)));
+        copter.wind_ang = degrees(atanf(abs(wind_e) / abs(wind_n)));
         if (wind_e >= 0.0f) {
-            if (wind_n <= 0.0f) { wind_ang = 180.0f - wind_ang; }
+            if (wind_n <= 0.0f) { copter.wind_ang = 180.0f - copter.wind_ang; }
         }
         else {
-            if (wind_n <= 0.0f) { wind_ang = 180.0f + wind_ang; }
-            else { wind_ang = 360.0f - wind_ang; }
-        }
-        if (counter2 == 9) {
-            gcs().send_text(MAV_SEVERITY_INFO, "wind ang %3.3f; n %3.3f e %3.3f", wind_ang, wind_n, wind_e);
+            if (wind_n <= 0.0f) { copter.wind_ang = 180.0f + copter.wind_ang; }
+            else { copter.wind_ang = 360.0f - copter.wind_ang; }
         }
     }
 
+    // calculate wind velocity
+    copter.wind_vel = sqrtf(wind_e * wind_e + wind_n * wind_n) / copter.wind_data_total_items / 2.0f; // TODO add to coef
+
+    static int counter2 = 0;
+    counter2 = (counter2 + 1) % 5;
+    if (counter2 == 4) {
+        //gcs().send_text(MAV_SEVERITY_INFO, "wind %3.3f* %3.3fm/s; n %3.3f e %3.3f", wind_ang, wind_vel, wind_n, wind_e);
+        gcs().send_text(MAV_SEVERITY_INFO, "wind %0.0f* %2.2fm/s", copter.wind_ang, copter.wind_vel);
+    }
 }
+
+// -------------------------------------------
 
 
 // failsafe_ekf_event - perform ekf failsafe
