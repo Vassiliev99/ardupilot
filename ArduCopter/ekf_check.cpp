@@ -130,7 +130,7 @@ bool Copter::ekf_over_threshold()
 
     }
 
-    /*if (position_variance > 1.0f) { // TODO choose value
+    /*if (position_variance > 1.0f) { // choose value
         gcs().send_text(MAV_SEVERITY_WARNING, "Problems with GPS position%5.5f", position_variance);
         AP::logger().Write("EKFP", "TimeUS,PosVar", "Qf", AP_HAL::micros64(), position_variance);
         return true;
@@ -294,7 +294,7 @@ void Copter::accum_wind() {
         return;
     } //TODO remove
 
-    if (copter.wind_data_last_item != 0 && millis() - copter.wind_data[copter.wind_data_last_item].ms < 1000) { //TODO change 1000ms ?
+    if (copter.wind_data_last_item != 0 && millis() - copter.wind_data[copter.wind_data_last_item].ms < (uint32_t)g.wind_data_save_ms) {
         return;
     }
 
@@ -357,16 +357,18 @@ void Copter::accum_wind() {
         vel_p = vel_ne * sinf(alpha);
     }
     
-    static int counter1 = 0;
-    counter1 = (counter1 + 1) % 5;
-    if (counter1 == 4) {
-        //gcs().send_text(MAV_SEVERITY_INFO, "r %2.2f %3.3f; p %2.2f %3.3f; y %2.2f", roll, vel_r, pitch, vel_p, yaw);
+    if (g.wind_setup) {
+        static int counter1 = 0;
+        counter1 = (counter1 + 1) % 3;
+        if (counter1 == 2) {
+            gcs().send_text(MAV_SEVERITY_INFO, "r %2.2f %3.3f; p %2.2f %3.3f; y %2.2f", roll, vel_r, pitch, vel_p, yaw);
+        }
     }
 
     // save values for future wind calculation
     wind_data_t wd = {millis(), roll, pitch, yaw, vel_r, vel_p};
-    copter.wind_data_last_item = (copter.wind_data_last_item + 1) % 100; // TODO get 100 from param
-    if (copter.wind_data_total_items < 100) { copter.wind_data_total_items += 1; }
+    copter.wind_data_last_item = (copter.wind_data_last_item + 1) % WIND_DATA_COUNT;
+    if (copter.wind_data_total_items < WIND_DATA_COUNT) { copter.wind_data_total_items += 1; }
     copter.wind_data[copter.wind_data_last_item] = wd;
 }
 
@@ -374,14 +376,15 @@ void Copter::calc_wind() {
     if (!copter.accum_wind_initialised || copter.wind_data_total_items == 0) {
         return;
     }
+ 
 
     // calculate wind vector (east north) from saved values
     float wind_e = 0;
     float wind_n = 0;
     for (int i = 0; i < copter.wind_data_total_items; i++) {
         wind_data_t wd = copter.wind_data[i];
-        float roll_wind = wd.roll - wd.vel_r * 3.7f; // TODO coefs
-        float pitch_wind = wd.pitch - wd.vel_p * 3.7f; 
+        float roll_wind = wd.roll - wd.vel_r * g.angle_velocity_coef; // TODO check if non linear coefs
+        float pitch_wind = wd.pitch - wd.vel_p * g.angle_velocity_coef; 
         float alpha;
         if (0.0f <= wd.yaw && wd.yaw < 90.0f) {
             alpha = radians(wd.yaw);
@@ -423,13 +426,15 @@ void Copter::calc_wind() {
     }
 
     // calculate wind velocity
-    copter.wind_vel = sqrtf(wind_e * wind_e + wind_n * wind_n) / copter.wind_data_total_items / 2.0f; // TODO add to coef
+    copter.wind_vel = sqrtf(wind_e * wind_e + wind_n * wind_n) / copter.wind_data_total_items / g.wind_velocity_coef; // TODO check if non linear
 
-    static int counter2 = 0;
-    counter2 = (counter2 + 1) % 5;
-    if (counter2 == 4) {
-        //gcs().send_text(MAV_SEVERITY_INFO, "wind %3.3f* %3.3fm/s; n %3.3f e %3.3f", wind_ang, wind_vel, wind_n, wind_e);
-        gcs().send_text(MAV_SEVERITY_INFO, "wind %0.0f* %2.2fm/s", copter.wind_ang, copter.wind_vel);
+    if (!g.wind_setup) {
+        static int counter2 = 0;
+        counter2 = (counter2 + 1) % 5;
+        if (counter2 == 4) {
+            //gcs().send_text(MAV_SEVERITY_INFO, "wind %3.3f* %3.3fm/s; n %3.3f e %3.3f", wind_ang, wind_vel, wind_n, wind_e);
+            gcs().send_text(MAV_SEVERITY_INFO, "wind %0.0f* %2.2fm/s", copter.wind_ang, copter.wind_vel);
+        }
     }
 }
 

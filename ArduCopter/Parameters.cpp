@@ -50,6 +50,34 @@ const AP_Param::Info Copter::var_info[] = {
     // @User: Advanced
     GSCALAR(rtl_nogps_curr_yaw_delta, "RTL_NOGPS_CY_DLT",   RTL_NOGPS_CURR_YAW_DELTA_DEFAULT),
 
+    // @Param: WIND_DATA_SV_MS
+    // @DisplayName: Wind data save each X ms
+    // @Description: Wind data save each X ms
+    // @Range: 100 100000
+    // @User: Advanced
+    GSCALAR(wind_data_save_ms, "WIND_DATA_SV_MS",   WIND_DATA_SAVE_MS_DEFAULT),
+
+    // @Param: ANG_VEL_COEF
+    // @DisplayName: Angle/velocity coefficient for wind calculation
+    // @Description: Angle/velocity coefficient for wind calculation
+    // @Range: 0.0f 10.0f
+    // @User: Advanced
+    GSCALAR(angle_velocity_coef, "ANG_VEL_COEF",   ANG_VEL_COEF_DEFAULT),
+
+    // @Param: WIND_VEL_COEF
+    // @DisplayName: Wind velocity coefficient
+    // @Description: Wind velocity coefficient
+    // @Range: 0.0f 10.0f
+    // @User: Advanced
+    GSCALAR(wind_velocity_coef, "WIND_VEL_COEF",   WIND_VEL_COEF_DEFAULT),
+
+    // @Param: WIND_SETUP
+    // @DisplayName: Wind setup (determine coefs)
+    // @Description: Wind setup (determine coefs)
+    // @Range: 0 1
+    // @User: Advanced
+    GSCALAR(wind_setup, "WIND_SETUP",   0),
+
     // @Param: FORMAT_VERSION
     // @DisplayName: Eeprom format version number
     // @Description: This value is incremented when changes are made to the eeprom format

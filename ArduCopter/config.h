@@ -800,10 +800,19 @@
 #define RTL_NOGPS_CURR_YAW_DELTA_DEFAULT      1.0f  
 #endif
 
-#ifndef RTL_NOGPS_YAW_RATE_BASE_DEFAULT
-#define RTL_NOGPS_YAW_RATE_BASE_DEFAULT      200.0f  
+#ifndef WIND_DATA_COUNT
+#define WIND_DATA_COUNT      1000
 #endif
 
-#ifndef RTL_NOGPS_YAW_RATE_MULT_DEFAULT
-#define RTL_NOGPS_YAW_RATE_MULT_DEFAULT      15.0f  
+#ifndef WIND_DATA_SAVE_MS_DEFAULT
+#define WIND_DATA_SAVE_MS_DEFAULT      1000 
 #endif
+
+#ifndef ANG_VEL_COEF_DEFAULT
+#define ANG_VEL_COEF_DEFAULT      3.7f 
+#endif
+
+#ifndef WIND_VEL_COEF_DEFAULT
+#define WIND_VEL_COEF_DEFAULT      2.0f 
+#endif
+
