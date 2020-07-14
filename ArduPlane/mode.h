@@ -38,6 +38,7 @@ public:
         QRTL          = 21,
         QAUTOTUNE     = 22,
         QACRO         = 23,
+        LAND_PARACHUTE = 24,
     };
 
     // Constructor
@@ -479,4 +480,26 @@ protected:
     Location start_loc;
 
     bool _enter() override;
+};
+
+
+
+
+class ModeLandParachute : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::LAND_PARACHUTE; }
+    const char *name() const override { return "Land_Parachute"; }
+    const char *name4() const override { return "LNDP"; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+
+protected:
+
+    bool _enter() override;
+
+    int8_t curr_stage;
+    int32_t stage_started_ms;
 };
