@@ -236,6 +236,7 @@ public:
     friend class ModeThrow;
     friend class ModeZigZag;
     friend class ModeAutorotate;
+    friend class ModeRTLNoGPS;
 
     Copter(void);
 
@@ -719,6 +720,32 @@ private:
     void check_ekf_reset();
     void check_vibration();
 
+    void check_gps_position();
+    void check_gps_failsafe();
+    bool check_gps_initialised;
+    bool gps_glitch;
+    Location gps_last_good_loc;
+    Vector3f gps_last_good_vel;
+    uint32_t gps_last_good_update_ms;
+
+    void accum_wind();
+    void calc_wind();
+    bool accum_wind_initialised;
+    typedef struct {
+        uint32_t ms;
+        float roll;
+        float pitch;
+        float yaw;
+        float vel_r;
+        float vel_p;
+    } wind_data_t;
+    wind_data_t wind_data[WIND_DATA_COUNT];
+    int wind_data_last_item;
+    int wind_data_total_items;
+    float wind_ang;
+    float wind_vel;
+
+
     // esc_calibration.cpp
     void esc_calibration_startup_check();
     void esc_calibration_passthrough();
@@ -929,6 +956,10 @@ private:
 #endif
 #endif
     ModeAltHold mode_althold;
+
+#if MODE_RTL_NOGPS_ENABLED == ENABLED
+    ModeRTLNoGPS mode_rtl_nogps;
+#endif
 #if MODE_AUTO_ENABLED == ENABLED
     ModeAuto mode_auto;
 #endif

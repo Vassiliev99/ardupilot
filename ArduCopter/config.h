@@ -282,6 +282,12 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// RTL No GPS - return to home by compass
+#ifndef MODE_RTL_NOGPS_ENABLED
+# define MODE_RTL_NOGPS_ENABLED ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // Brake mode - bring vehicle to stop
 #ifndef MODE_BRAKE_ENABLED
 # define MODE_BRAKE_ENABLED ENABLED
@@ -791,4 +797,29 @@
 
 #ifndef HAL_FRAME_TYPE_DEFAULT
 #define HAL_FRAME_TYPE_DEFAULT AP_Motors::MOTOR_FRAME_TYPE_X
+#endif
+
+
+#ifndef RTL_NOGPS_PITCH_DEFAULT
+#define RTL_NOGPS_PITCH_DEFAULT      -1000.0f  
+#endif
+
+#ifndef RTL_NOGPS_CURR_YAW_DELTA_DEFAULT
+#define RTL_NOGPS_CURR_YAW_DELTA_DEFAULT      1.0f  
+#endif
+
+#ifndef WIND_DATA_COUNT
+#define WIND_DATA_COUNT      1000
+#endif
+
+#ifndef WIND_DATA_SAVE_MS_DEFAULT
+#define WIND_DATA_SAVE_MS_DEFAULT      1000 
+#endif
+
+#ifndef ANG_VEL_COEF_DEFAULT
+#define ANG_VEL_COEF_DEFAULT      3.7f 
+#endif
+
+#ifndef WIND_VEL_COEF_DEFAULT
+#define WIND_VEL_COEF_DEFAULT      2.0f 
 #endif

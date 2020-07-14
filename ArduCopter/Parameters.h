@@ -375,7 +375,23 @@ public:
 
         // the k_param_* space is 9-bits in size
         // 511: reserved
+
+        k_param_rtl_nogps_pitch = 258,
+        k_param_rtl_nogps_curr_yaw_delta,
+
+        k_param_wind_data_save_ms,
+        k_param_angle_velocity_coef,
+        k_param_wind_velocity_coef,
+        k_param_wind_setup
     };
+
+    AP_Float        rtl_nogps_pitch;
+    AP_Float        rtl_nogps_curr_yaw_delta;
+    AP_Int16        wind_data_save_ms;
+    AP_Float        angle_velocity_coef;
+    AP_Float        wind_velocity_coef;
+    AP_Int8         wind_setup;
+    
 
     AP_Int16        format_version;
 

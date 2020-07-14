@@ -47,6 +47,14 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             ret = &mode_althold;
             break;
 
+
+#if MODE_RTL_NOGPS_ENABLED == ENABLED
+        case Mode::Number::RTL_NOGPS:
+            ret = &mode_rtl_nogps;
+            break;
+#endif
+
+
 #if MODE_AUTO_ENABLED == ENABLED
         case Mode::Number::AUTO:
             ret = &mode_auto;

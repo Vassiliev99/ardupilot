@@ -43,6 +43,14 @@ void Copter::ekf_check()
         return;
     }
 
+
+    check_gps_position();
+    check_gps_failsafe();
+    accum_wind();
+    calc_wind();
+
+
+
     // compare compass and velocity variance vs threshold
     if (ekf_over_threshold()) {
         // if compass is not yet flagged as bad
@@ -156,6 +164,19 @@ void Copter::failsafe_ekf_event()
 
     // take action based on fs_ekf_action parameter
     switch (g.fs_ekf_action) {
+        case FS_EKF_ACTION_RTL_NOGPS:
+            {
+                Location home_loc = ahrs.get_home();
+                if (copter.gps_last_good_loc.get_distance(home_loc) < 500) {
+                    if (failsafe.radio || !set_mode(Mode::Number::ALT_HOLD, ModeReason::EKF_FAILSAFE)) {
+                        set_mode_land_with_pause(ModeReason::EKF_FAILSAFE);
+                    }
+                }
+                else {
+                    set_mode(Mode::Number::RTL_NOGPS, ModeReason::EKF_FAILSAFE);
+                }
+                break;
+            }
         case FS_EKF_ACTION_ALTHOLD:
             // AltHold
             if (failsafe.radio || !set_mode(Mode::Number::ALT_HOLD, ModeReason::EKF_FAILSAFE)) {
@@ -272,3 +293,281 @@ void Copter::check_vibration()
         }
     }
 }
+
+
+
+// ------------- OLD GPS FAILSAFE ---------------
+
+void Copter::check_gps_position() {
+    uint32_t now = millis();        // current system time
+    float sane_dt;                  // time since last sane gps reading
+    float accel_based_distance;     // movement based on max acceleration
+    Location curr_pos;              // our current position estimate
+    Location gps_pos;               // gps reported position
+    float distance_cm;              // distance from gps to current position estimate in cm
+    bool all_ok;                    // true if the new gps position passes sanity checks
+
+    // exit immediately if we don't have gps lock
+    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
+        copter.gps_glitch = true;
+        return;
+    }
+
+    // if not initialised or disabled update last good position and exit
+    if (!copter.check_gps_initialised) {
+        copter.gps_last_good_loc = gps.location();
+        copter.gps_last_good_vel = gps.velocity();
+        copter.gps_last_good_update_ms = now;
+        copter.check_gps_initialised = true;
+        copter.gps_glitch = false;
+        return;
+    }
+
+    // calculate time since last sane gps reading in ms
+    sane_dt = (now - copter.gps_last_good_update_ms) / 1000.0f;
+
+    // project forward our position from last known velocity
+    curr_pos = copter.gps_last_good_loc;
+    curr_pos.offset(copter.gps_last_good_vel.x * sane_dt, copter.gps_last_good_vel.y * sane_dt);
+
+    // calculate distance from recent gps position to current estimate
+    gps_pos = gps.location();
+    distance_cm = curr_pos.get_distance(gps_pos) * 100.0f;
+
+    // all ok if within a given hardcoded radius
+    if (distance_cm <= 200.0f) { //TODO add to params
+        all_ok = true;
+    }else{
+        // or if within the maximum distance we could have moved based on our acceleration
+        accel_based_distance = 0.5f * 1000.0f * sane_dt * sane_dt; //TODO add to params _accel_max_cmss = 1000.0f
+        all_ok = (distance_cm <= accel_based_distance);
+    }
+
+    // store updates to gps position
+    if (all_ok) {
+        // position is acceptable
+        copter.gps_last_good_update_ms = now;
+        copter.gps_last_good_loc = gps_pos;
+        copter.gps_last_good_vel = gps.velocity();
+    }
+
+    // update glitching flag
+    copter.gps_glitch = !all_ok;
+}
+
+// failsafe_gps_check - check for gps failsafe
+void Copter::check_gps_failsafe()
+{
+    uint32_t last_gps_update_ms;
+
+    // return immediately if gps failsafe is disabled or we have never had GPS lock
+    if (!AP::ahrs().home_is_set()) { //TODO add param to disable gps failsafe
+        // if we have just disabled the gps failsafe, ensure the gps failsafe event is cleared
+        if (failsafe.ekf) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "GPS Failsafe resolved");
+            failsafe_ekf_off_event();
+        }
+        return;
+    }
+
+    // calc time since last gps update
+    last_gps_update_ms = millis() - copter.gps_last_good_update_ms;
+
+    // check if all is well
+    if (last_gps_update_ms < 5000) { //TODO add define FAILSAFE_GPS_TIMEOUT_MS 5000
+        // check for recovery from gps failsafe
+        if (failsafe.ekf) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "GPS Failsafe resolved");
+            failsafe_ekf_off_event();
+        }
+        return;
+    }
+
+    // do nothing if gps failsafe already triggered or motors disarmed
+    if (failsafe.ekf || !motors->armed()) {
+        return;
+    }
+
+    // GPS failsafe event has occured
+    // update state, warn the ground station and log to dataflash
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "GPS Failsafe");
+    AP::logger().Write_Error(LogErrorSubsystem::FAILSAFE_GPS, LogErrorCode::FAILSAFE_OCCURRED);
+
+    failsafe_ekf_event();
+
+    /*// take action based on flight mode and FS_GPS_ENABLED parameter
+    if (mode_requires_GPS(control_mode) || g.failsafe_gps_enabled == FS_GPS_LAND_EVEN_STABILIZE) {
+        if (g.failsafe_gps_enabled == FS_GPS_ALTHOLD && !failsafe.radio) {
+            set_mode(ALT_HOLD);
+        }else{
+            set_mode_land_with_pause();
+        }
+    }
+    // if flight mode is LAND ensure it's not the GPS controlled LAND
+    if (control_mode == LAND) {
+        land_do_not_use_GPS();
+    }*/
+}
+
+
+// -------------------------------------------
+
+
+// ------------------WIND---------------------
+
+void Copter::accum_wind() {
+    // initialise wind variables
+    if (!copter.accum_wind_initialised) {
+        copter.wind_data_last_item = 0;
+        copter.wind_data_total_items = 0;
+        copter.accum_wind_initialised = true;
+
+        return;
+    } //TODO remove
+
+    if (copter.wind_data_last_item != 0 && millis() - copter.wind_data[copter.wind_data_last_item].ms < (uint32_t)g.wind_data_save_ms) {
+        return;
+    }
+
+    Vector3f vel;
+    if (!ahrs.get_velocity_NED(vel)) {
+        gcs().send_text(MAV_SEVERITY_WARNING, "Can not get velocity for wind calculation");
+        return;
+    }
+
+    // check if flight is stable without accelerations
+    Vector3f accel = ahrs.get_accel_ef();
+    if (abs(accel.x) > 0.15f || abs(accel.y) > 0.15f) { // TODO is it required?
+        //gcs().send_text(MAV_SEVERITY_INFO, "accel %3.3f %3.3f %3.3f", accel.x, accel.y, accel.z);
+        return;
+    }
+
+    // copter velocity (east north)
+    float vel_e = vel.y;
+    float vel_n = vel.x;
+    // combined horizontal velocity (both east and north)
+    float vel_ne = sqrtf(vel_e * vel_e + vel_n * vel_n);
+    // velocity angle (0 - 360)
+    float vel_ang = degrees(atanf(abs(vel_e) / abs(vel_n)));
+    if (vel_e >= 0) {
+        if (vel_n <= 0) { vel_ang = 180.0f - vel_ang; }
+    }
+    else {
+        if (vel_n <= 0) { vel_ang = 180.0f + vel_ang; }
+        else { vel_ang = 360.0f - vel_ang; }
+    }
+
+    float roll = degrees(ahrs.get_roll()); // -180 - 180
+    float pitch = degrees(ahrs.get_pitch()); // -180 - 180
+    float yaw = degrees(wrap_2PI(ahrs.get_yaw())); // 0 - 360
+    // reverse pitch so it will be positive on forward flight 
+    pitch = - pitch;
+
+    //velocity angle regarding roll and pitch
+    float vel_ang_rp = wrap_360(vel_ang - yaw);
+    // calculate velocity by roll and pitch
+    float vel_r, vel_p, alpha;
+    if (0.0f <= vel_ang_rp && vel_ang_rp < 90.0f) {
+        alpha = radians(vel_ang_rp);
+        vel_r = vel_ne * sinf(alpha);
+        vel_p = vel_ne * cosf(alpha);
+    }
+    else if (90.0f <= vel_ang_rp && vel_ang_rp < 180.0f) {
+        alpha = radians(vel_ang_rp - 90.0f);
+        vel_r = vel_ne * cosf(alpha);
+        vel_p = - vel_ne * sinf(alpha);
+    }
+    else if (180.0f <= vel_ang_rp && vel_ang_rp < 270.0f) {
+        alpha = radians(vel_ang_rp - 180.0f);
+        vel_r = - vel_ne * sinf(alpha);
+        vel_p = - vel_ne * cosf(alpha);
+    }
+    else {
+        alpha = radians(vel_ang_rp - 270.0f);
+        vel_r = - vel_ne * cosf(alpha);
+        vel_p = vel_ne * sinf(alpha);
+    }
+
+    if (g.wind_setup) {
+        static int counter1 = 0;
+        counter1 = (counter1 + 1) % 3;
+        if (counter1 == 2) {
+            gcs().send_text(MAV_SEVERITY_INFO, "r %2.2f %3.3f; p %2.2f %3.3f; y %2.2f", roll, vel_r, pitch, vel_p, yaw);
+        }
+    }
+
+    // save values for future wind calculation
+    wind_data_t wd = {millis(), roll, pitch, yaw, vel_r, vel_p};
+    copter.wind_data_last_item = (copter.wind_data_last_item + 1) % WIND_DATA_COUNT;
+    if (copter.wind_data_total_items < WIND_DATA_COUNT) { copter.wind_data_total_items += 1; }
+    copter.wind_data[copter.wind_data_last_item] = wd;
+}
+
+void Copter::calc_wind() {
+    if (!copter.accum_wind_initialised || copter.wind_data_total_items == 0) {
+        return;
+    }
+
+
+    // calculate wind vector (east north) from saved values
+    float wind_e = 0;
+    float wind_n = 0;
+    for (int i = 0; i < copter.wind_data_total_items; i++) {
+        wind_data_t wd = copter.wind_data[i];
+        float roll_wind = wd.roll - wd.vel_r * g.angle_velocity_coef; // TODO check if non linear coefs
+        float pitch_wind = wd.pitch - wd.vel_p * g.angle_velocity_coef; 
+        float alpha;
+        if (0.0f <= wd.yaw && wd.yaw < 90.0f) {
+            alpha = radians(wd.yaw);
+            wind_e += roll_wind * cosf(alpha) + pitch_wind * sinf(alpha);
+            wind_n += - roll_wind * sinf(alpha) + pitch_wind * cosf(alpha);
+        }
+        else if (90.0f <= wd.yaw && wd.yaw < 180.0f) {
+            alpha = radians(wd.yaw - 90.0f);
+            wind_e += - roll_wind * sinf(alpha) + pitch_wind * cosf(alpha);
+            wind_n += - roll_wind * cosf(alpha) - pitch_wind * sinf(alpha);
+        }
+        else if (180.0f <= wd.yaw && wd.yaw < 270.0f) {
+            alpha = radians(wd.yaw - 180.0f);
+            wind_e += - roll_wind * cosf(alpha) - pitch_wind * sinf(alpha);
+            wind_n += roll_wind * sinf(alpha) - pitch_wind * cosf(alpha);
+        }
+        else {
+            alpha = radians(wd.yaw - 270.0f);
+            wind_e += roll_wind * sinf(alpha) - pitch_wind * cosf(alpha);
+            wind_n += roll_wind * cosf(alpha) + pitch_wind * sinf(alpha);
+        }
+    }
+
+    // calculate wind angle from wind vector
+    if (is_zero(wind_n)) {
+        if (is_zero(wind_e)) { copter.wind_ang = 0.0f; }
+        else if (wind_e > 0.0f) { copter.wind_ang = 90.0f; }
+        else { copter.wind_ang = 270.0f; }
+    }
+    else {
+        copter.wind_ang = degrees(atanf(abs(wind_e) / abs(wind_n)));
+        if (wind_e >= 0.0f) {
+            if (wind_n <= 0.0f) { copter.wind_ang = 180.0f - copter.wind_ang; }
+        }
+        else {
+            if (wind_n <= 0.0f) { copter.wind_ang = 180.0f + copter.wind_ang; }
+            else { copter.wind_ang = 360.0f - copter.wind_ang; }
+        }
+    }
+
+    // calculate wind velocity
+    copter.wind_vel = sqrtf(wind_e * wind_e + wind_n * wind_n) / copter.wind_data_total_items / g.wind_velocity_coef; // TODO check if non linear
+
+    if (!g.wind_setup) {
+        static int counter2 = 0;
+        counter2 = (counter2 + 1) % 5;
+        if (counter2 == 4) {
+            //gcs().send_text(MAV_SEVERITY_INFO, "wind %3.3f* %3.3fm/s; n %3.3f e %3.3f", wind_ang, wind_vel, wind_n, wind_e);
+            gcs().send_text(MAV_SEVERITY_INFO, "wind %0.0f* %2.2fm/s", copter.wind_ang, copter.wind_vel);
+        }
+    }
+}
+
+// -------------------------------------------
+
