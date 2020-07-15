@@ -3,7 +3,6 @@
 
 bool ModeLandParachute::_enter()
 {
-
     curr_stage = 0;
     stage_started_ms = millis();
 
@@ -18,7 +17,7 @@ bool ModeLandParachute::_enter()
     plane.guided_WP_loc = plane.current_loc;
     plane.set_guided_WP();
 
-    return true;
+    return true; //test
 }
 
 void ModeLandParachute::update()
