@@ -7,6 +7,17 @@ bool ModeLandParachute::_enter()
     curr_stage = 0;
     stage_started_ms = millis();
 
+    plane.throttle_allows_nudging = true;
+    plane.auto_throttle_mode = true;
+    plane.auto_navigation_mode = true;
+    plane.guided_throttle_passthru = false;
+    /*
+      when entering guided mode we set the target as the current
+      location. This matches the behaviour of the copter code
+    */
+    plane.guided_WP_loc = plane.current_loc;
+    plane.set_guided_WP();
+
     return true;
 }
 
@@ -16,10 +27,15 @@ void ModeLandParachute::update()
     counter++;
     if (counter == 50) {
         counter = 0;
-        gcs().send_text(MAV_SEVERITY_INFO, "Current stage: %d", curr_stage);
+        //gcs().send_text(MAV_SEVERITY_INFO, "Current stage: %d", curr_stage);
     }
 
-    SRV_Channels::set_output_pwm(SRV_Channel::k_throttle, 1000); // disable motor
+    plane.calc_nav_roll();
+    plane.calc_nav_pitch();
+    plane.calc_throttle();
+
+
+    /*SRV_Channels::set_output_pwm(SRV_Channel::k_throttle, 1000); // disable motor
 
     switch (curr_stage) {
     case 0: // wait for motor to stop
@@ -63,5 +79,5 @@ void ModeLandParachute::update()
         break;
     case 4: // end
         break;
-    }
+    }*/
 }
