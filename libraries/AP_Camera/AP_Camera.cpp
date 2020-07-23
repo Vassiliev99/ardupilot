@@ -106,6 +106,13 @@ const AP_Param::GroupInfo AP_Camera::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("TYPE",  11, AP_Camera, _type, 0),
 
+    // @Param: NO_PHOTO_MSG
+    // @DisplayName: No photo message (0: No, 1: Yes)
+    // @Description: Send message to gcs if camera did not take photo
+    // @Values: 0:No,1:Yes
+    // @User: Standard
+    AP_GROUPINFO("NO_PHOTO_MSG",  12, AP_Camera, _type, 0),
+
     AP_GROUPEND
 };
 
@@ -412,6 +419,12 @@ void AP_Camera::log_picture()
     } else {
         if (logger->should_log(log_camera_bit)) {
             logger->Write_Trigger(current_loc);
+            if (true) { //TODO add param
+                if (last_trig_log_ms != 0 && last_cam_log_ms < last_trig_log_ms) {
+                    gcs().send_text(MAV_SEVERITY_WARNING, "No photo feedback");
+                }
+                last_trig_log_ms = AP_HAL::millis();
+            }
         }
     }
 }
@@ -449,6 +462,7 @@ void AP_Camera::update_trigger()
                 uint32_t tdiff = AP_HAL::micros() - timestamp32;
                 uint64_t timestamp = AP_HAL::micros64();
                 logger->Write_Camera(current_loc, timestamp - tdiff);
+                last_cam_log_ms = AP_HAL::millis();
             }
         }
     }
