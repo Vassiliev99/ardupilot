@@ -419,7 +419,7 @@ void AP_Camera::log_picture()
     } else {
         if (logger->should_log(log_camera_bit)) {
             logger->Write_Trigger(current_loc);
-            if (true) { //TODO add param
+            if (true) {
                 if (last_trig_log_ms != 0 && last_cam_log_ms < last_trig_log_ms) {
                     gcs().send_text(MAV_SEVERITY_WARNING, "No photo feedback");
                 }
