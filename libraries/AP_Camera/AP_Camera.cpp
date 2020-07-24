@@ -106,12 +106,12 @@ const AP_Param::GroupInfo AP_Camera::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("TYPE",  11, AP_Camera, _type, 0),
 
-    // @Param: NO_PHOTO_MSG
-    // @DisplayName: No photo message (0: No, 1: Yes)
-    // @Description: Send message to gcs if camera did not take photo
+    // @Param: CHECK_FEEDBACK
+    // @DisplayName: Check camera feedback (0: No, 1: Yes)
+    // @Description: Send message to gcs if camera feedback not received after trigger
     // @Values: 0:No,1:Yes
     // @User: Standard
-    AP_GROUPINFO("NO_PHOTO_MSG",  12, AP_Camera, _type, 0),
+    AP_GROUPINFO("CHECK_FEEDBACK",  12, AP_Camera, _check_feedback, 0),
 
     AP_GROUPEND
 };
@@ -419,9 +419,9 @@ void AP_Camera::log_picture()
     } else {
         if (logger->should_log(log_camera_bit)) {
             logger->Write_Trigger(current_loc);
-            if (true) {
+            if (_check_feedback) {
                 if (last_trig_log_ms != 0 && last_cam_log_ms < last_trig_log_ms) {
-                    gcs().send_text(MAV_SEVERITY_WARNING, "No photo feedback");
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Camera feedback not received");
                 }
                 last_trig_log_ms = AP_HAL::millis();
             }

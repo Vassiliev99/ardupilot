@@ -89,7 +89,7 @@ private:
     uint8_t         _trigger_counter_cam_function;   // count of number of cycles alternative camera function has been held open
     AP_Int8         _auto_mode_only;    // if 1: trigger by distance only if in AUTO mode.
     AP_Int8         _type;              // Set the type of camera in use, will open additional parameters if set
-    AP_Int8         _no_photo_msg;      // If should send photo message
+    AP_Int8         _check_feedback;    // Send message to gcs if camera feedback not received after trigger
     bool            _is_in_auto_mode;   // true if in AUTO mode
 
     void            servo_pic();        // Servo operated camera
@@ -135,7 +135,7 @@ private:
     }
 
 
-    // variables for camera error detection
+    // variables for camera feedback check
     uint32_t last_trig_log_ms;
     uint32_t last_cam_log_ms;
 
